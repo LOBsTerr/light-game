@@ -1,1 +1,1 @@
-# light-game
+# Light game
