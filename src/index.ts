@@ -1,8 +1,138 @@
-
-enum Orientation {
-    FLAT = "flat",
-    POINTY = "pointy"
+class OffsetValue {
+    constructor(public x: number, public y: number) {}
 }
+
+class Orientation {
+    static readonly flat = 'flat';
+    static readonly pointy = 'pointy';
+
+    protected angles: Map<number, OffsetValue> = new Map();
+
+    constructor (public orientation: string = Orientation.flat) {
+        if (this.isFlat()) {
+            this.angles.set(0, new OffsetValue(-2, 0));
+            this.angles.set(1, new OffsetValue(-1, Math.sqrt(3)));
+            this.angles.set(2, new OffsetValue(1, Math.sqrt(3)));
+            this.angles.set(3, new OffsetValue(2, 0));
+            this.angles.set(4, new OffsetValue(1, -Math.sqrt(3)));
+            this.angles.set(5, new OffsetValue(-1, -Math.sqrt(3)));
+        }
+        else {           
+            this.angles.set(0, new OffsetValue(0, 2));
+            this.angles.set(1, new OffsetValue(Math.sqrt(3), -1));
+            this.angles.set(2, new OffsetValue(Math.sqrt(3), 1));
+            this.angles.set(3, new OffsetValue(0, -2));
+            this.angles.set(4, new OffsetValue(-Math.sqrt(3), -1));
+            this.angles.set(5, new OffsetValue(-Math.sqrt(3), 1));
+        }
+    }
+
+    public getOffsetX(angle: number) {
+        return  this.angles.get(angle)?.x || 0;
+    }
+
+    public getOffsetY(angle: number) {
+        return this.angles.get(angle)?.y || 0;
+    }
+
+    protected isFlat() {
+        return this.orientation == Orientation.flat;
+    }
+
+}
+
+class Point {
+    constructor(public x: number, public y: number) { }
+}
+
+class Item {
+    public neighbours : Map<number, Item> = new Map();
+    constructor (public center: Point) {}
+}
+
+
+class Layout {
+    protected orientation: Orientation;
+    protected items: Item[] = [];
+    protected canvas: Canvas = new Canvas();
+    protected center: Point;
+
+    constructor(
+        protected size: number,
+        protected levelCount: number = 1,
+        orientation: string = Orientation.flat,
+    ) {
+        this.orientation = new Orientation(orientation);
+        if (this.levelCount < 1) {
+            throw Error("Level count should be bigger than 0.");
+        }
+
+        this.center = new Point(this.canvas.canvas.width / 2, this.canvas.canvas.height / 2);
+
+        this.buildLevels();
+
+        this.draw();
+    }
+
+    protected draw() {
+        for (let item of this.items) {
+            this.canvas.drawCircle(item.center, this.size);
+        }
+    }
+
+    protected buildLevels(): void {
+
+        let item: Item = new Item(this.center);
+        this.items.push(item);
+
+        this.addNeighbours(item, 1);
+        
+    }
+
+    protected addNeighbours(currentItem: Item, currentLevel: number) {
+        currentLevel++;
+        if (currentLevel > this.levelCount) {
+            return;
+        }
+        for (let x = 0; x < 6; x++) {
+            let center = new Point(currentItem.center.x + this.size * this.orientation.getOffsetX(x), currentItem.center.y + this.size * this.orientation.getOffsetY(x));
+            let neighbour = new Item(center);
+            this.items.push(neighbour);
+            this.addNeighbours(neighbour, currentLevel);
+        }
+    }
+
+}
+
+
+class Canvas {
+
+    public canvas: HTMLCanvasElement;
+    public context: CanvasRenderingContext2D;
+
+    constructor() {
+        
+        this.canvas = document.getElementById("canvas") as HTMLCanvasElement;
+        if (this.canvas == null) {
+            throw new Error("Canvas is not found");
+        }
+
+        this.context = this.canvas.getContext("2d") as CanvasRenderingContext2D;
+        const dpr = window.devicePixelRatio;
+        this.canvas.height = 500;
+        this.canvas.width = 1000;
+        this.context.scale(dpr, dpr);
+    }
+
+    drawCircle(point: Point, radius: number) {
+        this.context.beginPath();
+        this.context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+        // this.context.fill();
+        this.context.stroke();
+    }
+}
+
+var layout = new Layout(20, 5, Orientation.pointy);
 
 class Hexagon {
     size: number;
@@ -30,9 +160,9 @@ class Hexagon {
     }
 
     draw(context: CanvasRenderingContext2D): void {
-        const halfWidth = this.getWidth() / 2;
-        const halfHeight = this.getHeight() / 2;
-        const halfSize = this.size / 2;
+        const halfWidth = this.getWidth();
+        const halfHeight = this.getHeight();
+        const halfSize = this.size;
         const isFlat = this.isFlat();
 
         const x1 = isFlat ? this.x - this.size : this.x;
@@ -62,103 +192,3 @@ class Hexagon {
         context.stroke();
     }
 }
-
-
-class Canvas {
-    size: number;
-    orientation: string;
-    canvas: HTMLCanvasElement;
-    context: CanvasRenderingContext2D;
-
-    constructor(size: number, orientation: string) {
-        this.size = size;
-        this.orientation = orientation;
-        
-        this.canvas = document.getElementById("canvas") as HTMLCanvasElement;
-        if (this.canvas == null) {
-            throw new Error("Canvas is not found");
-        }
-
-        this.context = this.canvas.getContext("2d") as CanvasRenderingContext2D;
-        const dpr = window.devicePixelRatio;
-        this.canvas.height = 500;
-        this.canvas.width = 1000;
-        this.context.scale(dpr, dpr);
-
-        const hex = new Hexagon(size, 50, 50, orientation);
-        const hex1 = new Hexagon(size, 150, 50, Orientation.POINTY);
-        const hex2 = new Hexagon(size, 250, 50, orientation);
-        hex1.draw(this.context);
-        hex2.draw(this.context);
-        hex.draw(this.context);
-        // this.drawVerticalCoordinates();
-        // this.drawHorizontalCoordinates();
-    }
-
-    getWidth(): number {
-        return this.isFlat() ? 2 * this.size : Math.sqrt(3) * this.size;
-    }
-
-    getHeight(): number {
-        return this.isFlat() ? Math.sqrt(3) * this.size : 2 * this.size;
-    }
-
-    getCoordinatesHorizontalStep(): number {
-        return this.isFlat() ? 3 * this.getWidth() / 4 : this.getWidth();
-    }
-
-    getCoordinatesVerticalStep(): number {
-        return this.isFlat() ? this.getHeight() : 3 * this.getHeight() / 4;
-    }
-
-
-    isFlat(): boolean {
-        return this.orientation == Orientation.FLAT;
-    }
-
-    drawVerticalCoordinates() {
-        let y = 0;
-        const height = this.canvas?.height;
-        if (height == undefined) {
-            return;
-        }
-        const width = this.canvas?.width;
-        if (width == undefined) {
-            return;
-        }
-
-        const step = this.getCoordinatesVerticalStep();
-        while (y < height) {
-            this.context.beginPath();
-            this.context.setLineDash([1, 2]);
-            this.context.moveTo(0, y);
-            this.context.lineTo(width, y);
-            this.context.stroke();
-            y += step;
-        }
-    }
-
-    drawHorizontalCoordinates() {
-        let x = 0;
-        const height = this.canvas?.height;
-        if (height == undefined) {
-            return;
-        }
-        const width = this.canvas?.width;
-        if (width == undefined) {
-            return;
-        }
-
-        const step = this.getCoordinatesHorizontalStep();
-        while (x < width) {
-            this.context.beginPath();
-            this.context.setLineDash([1, 2]);
-            this.context.moveTo(x, 0);
-            this.context.lineTo(x, height);
-            this.context.stroke();
-            x += step;
-        }
-    }
-}
-
-var canvas = new Canvas(50, Orientation.FLAT);

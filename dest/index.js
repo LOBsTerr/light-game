@@ -1,9 +1,114 @@
 "use strict";
-var Orientation;
-(function (Orientation) {
-    Orientation["FLAT"] = "flat";
-    Orientation["POINTY"] = "pointy";
-})(Orientation || (Orientation = {}));
+class OffsetValue {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+class Orientation {
+    constructor(orientation = Orientation.flat) {
+        this.orientation = orientation;
+        this.angles = new Map();
+        if (this.isFlat()) {
+            this.angles.set(0, new OffsetValue(-2, 0));
+            this.angles.set(1, new OffsetValue(-1, Math.sqrt(3)));
+            this.angles.set(2, new OffsetValue(1, Math.sqrt(3)));
+            this.angles.set(3, new OffsetValue(2, 0));
+            this.angles.set(4, new OffsetValue(1, -Math.sqrt(3)));
+            this.angles.set(5, new OffsetValue(-1, -Math.sqrt(3)));
+        }
+        else {
+            this.angles.set(0, new OffsetValue(0, 2));
+            this.angles.set(1, new OffsetValue(Math.sqrt(3), -1));
+            this.angles.set(2, new OffsetValue(Math.sqrt(3), 1));
+            this.angles.set(3, new OffsetValue(0, -2));
+            this.angles.set(4, new OffsetValue(-Math.sqrt(3), -1));
+            this.angles.set(5, new OffsetValue(-Math.sqrt(3), 1));
+        }
+    }
+    getOffsetX(angle) {
+        var _a;
+        return ((_a = this.angles.get(angle)) === null || _a === void 0 ? void 0 : _a.x) || 0;
+    }
+    getOffsetY(angle) {
+        var _a;
+        return ((_a = this.angles.get(angle)) === null || _a === void 0 ? void 0 : _a.y) || 0;
+    }
+    isFlat() {
+        return this.orientation == Orientation.flat;
+    }
+}
+Orientation.flat = 'flat';
+Orientation.pointy = 'pointy';
+class Point {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+    }
+}
+class Item {
+    constructor(center) {
+        this.center = center;
+        this.neighbours = new Map();
+    }
+}
+class Layout {
+    constructor(size, levelCount = 1, orientation = Orientation.flat) {
+        this.size = size;
+        this.levelCount = levelCount;
+        this.items = [];
+        this.canvas = new Canvas();
+        this.orientation = new Orientation(orientation);
+        if (this.levelCount < 1) {
+            throw Error("Level count should be bigger than 0.");
+        }
+        this.center = new Point(this.canvas.canvas.width / 2, this.canvas.canvas.height / 2);
+        this.buildLevels();
+        this.draw();
+    }
+    draw() {
+        for (let item of this.items) {
+            this.canvas.drawCircle(item.center, this.size);
+        }
+    }
+    buildLevels() {
+        let item = new Item(this.center);
+        this.items.push(item);
+        this.addNeighbours(item, 1);
+    }
+    addNeighbours(currentItem, currentLevel) {
+        currentLevel++;
+        if (currentLevel > this.levelCount) {
+            return;
+        }
+        for (let x = 0; x < 6; x++) {
+            let center = new Point(currentItem.center.x + this.size * this.orientation.getOffsetX(x), currentItem.center.y + this.size * this.orientation.getOffsetY(x));
+            let neighbour = new Item(center);
+            this.items.push(neighbour);
+            this.addNeighbours(neighbour, currentLevel);
+        }
+    }
+}
+class Canvas {
+    constructor() {
+        this.canvas = document.getElementById("canvas");
+        if (this.canvas == null) {
+            throw new Error("Canvas is not found");
+        }
+        this.context = this.canvas.getContext("2d");
+        const dpr = window.devicePixelRatio;
+        this.canvas.height = 500;
+        this.canvas.width = 1000;
+        this.context.scale(dpr, dpr);
+    }
+    drawCircle(point, radius) {
+        this.context.beginPath();
+        this.context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+        // this.context.fill();
+        this.context.stroke();
+    }
+}
+var layout = new Layout(20, 5, Orientation.pointy);
 class Hexagon {
     constructor(size, x, y, orientation) {
         this.x = x;
@@ -21,9 +126,9 @@ class Hexagon {
         return this.isFlat() ? Math.sqrt(3) * this.size : 2 * this.size;
     }
     draw(context) {
-        const halfWidth = this.getWidth() / 2;
-        const halfHeight = this.getHeight() / 2;
-        const halfSize = this.size / 2;
+        const halfWidth = this.getWidth();
+        const halfHeight = this.getHeight();
+        const halfSize = this.size;
         const isFlat = this.isFlat();
         const x1 = isFlat ? this.x - this.size : this.x;
         const x2 = isFlat ? this.x - halfSize : this.x + halfWidth;
@@ -48,84 +153,3 @@ class Hexagon {
         context.stroke();
     }
 }
-class Canvas {
-    constructor(size, orientation) {
-        this.size = size;
-        this.orientation = orientation;
-        this.canvas = document.getElementById("canvas");
-        if (this.canvas == null) {
-            throw new Error("Canvas is not found");
-        }
-        this.context = this.canvas.getContext("2d");
-        const dpr = window.devicePixelRatio;
-        this.canvas.height = 500;
-        this.canvas.width = 1000;
-        this.context.scale(dpr, dpr);
-        const hex = new Hexagon(size, 50, 50, orientation);
-        const hex1 = new Hexagon(size, 150, 50, Orientation.POINTY);
-        const hex2 = new Hexagon(size, 250, 50, orientation);
-        hex1.draw(this.context);
-        hex2.draw(this.context);
-        hex.draw(this.context);
-        // this.drawVerticalCoordinates();
-        // this.drawHorizontalCoordinates();
-    }
-    getWidth() {
-        return this.isFlat() ? 2 * this.size : Math.sqrt(3) * this.size;
-    }
-    getHeight() {
-        return this.isFlat() ? Math.sqrt(3) * this.size : 2 * this.size;
-    }
-    getCoordinatesHorizontalStep() {
-        return this.isFlat() ? 3 * this.getWidth() / 4 : this.getWidth();
-    }
-    getCoordinatesVerticalStep() {
-        return this.isFlat() ? this.getHeight() : 3 * this.getHeight() / 4;
-    }
-    isFlat() {
-        return this.orientation == Orientation.FLAT;
-    }
-    drawVerticalCoordinates() {
-        var _a, _b;
-        let y = 0;
-        const height = (_a = this.canvas) === null || _a === void 0 ? void 0 : _a.height;
-        if (height == undefined) {
-            return;
-        }
-        const width = (_b = this.canvas) === null || _b === void 0 ? void 0 : _b.width;
-        if (width == undefined) {
-            return;
-        }
-        const step = this.getCoordinatesVerticalStep();
-        while (y < height) {
-            this.context.beginPath();
-            this.context.setLineDash([1, 2]);
-            this.context.moveTo(0, y);
-            this.context.lineTo(width, y);
-            this.context.stroke();
-            y += step;
-        }
-    }
-    drawHorizontalCoordinates() {
-        var _a, _b;
-        let x = 0;
-        const height = (_a = this.canvas) === null || _a === void 0 ? void 0 : _a.height;
-        if (height == undefined) {
-            return;
-        }
-        const width = (_b = this.canvas) === null || _b === void 0 ? void 0 : _b.width;
-        if (width == undefined) {
-            return;
-        }
-        const step = this.getCoordinatesHorizontalStep();
-        while (x < width) {
-            this.context.beginPath();
-            this.context.setLineDash([1, 2]);
-            this.context.moveTo(x, 0);
-            this.context.lineTo(x, height);
-            this.context.stroke();
-            x += step;
-        }
-    }
-}
-var canvas = new Canvas(50, Orientation.FLAT);
