@@ -45,6 +45,9 @@ class Point {
         this.x = x;
         this.y = y;
     }
+    json() {
+        return JSON.stringify(this);
+    }
 }
 class Item {
     constructor(center) {
@@ -56,36 +59,99 @@ class Layout {
     constructor(size, levelCount = 1, orientation = Orientation.flat) {
         this.size = size;
         this.levelCount = levelCount;
-        this.items = [];
+        this.items = new Map();
         this.canvas = new Canvas();
+        this.contreAngles = {
+            0: 3,
+            1: 4,
+            2: 5,
+            3: 0,
+            4: 1,
+            5: 2
+        };
         this.orientation = new Orientation(orientation);
         if (this.levelCount < 1) {
             throw Error("Level count should be bigger than 0.");
         }
+        let map = new Map();
+        let p = new Point(1, 2);
+        map.set(p, new Point(3, 4));
+        console.log(JSON.stringify(new Point(1, 2)));
+        console.log(JSON.stringify(p));
+        let onClick = (event) => {
+            this.onClick(event);
+        };
+        onClick.bind(this);
+        this.canvas.canvas.addEventListener('click', onClick, false);
+        this.center = new Point(this.canvas.canvas.width / 2, this.canvas.canvas.height / 2);
         this.center = new Point(this.canvas.canvas.width / 2, this.canvas.canvas.height / 2);
         this.buildLevels();
         this.draw();
     }
+    onClick(event) {
+        // Get canvas coordinates based on clicked point on the screen.
+        const rect = this.canvas.canvas.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        // if we found the clicked circle redraw it.
+        let item = this.pointBelongCircle(new Point(x, y));
+        if (item) {
+            this.canvas.drawCircle(item.center, this.size, true);
+        }
+    }
     draw() {
-        for (let item of this.items) {
+        for (let item of this.items.values()) {
             this.canvas.drawCircle(item.center, this.size);
         }
     }
     buildLevels() {
         let item = new Item(this.center);
-        this.items.push(item);
-        this.addNeighbours(item, 1);
+        this.items.set(item.center.json(), item);
+        this.buildLevel(item, 1);
+        this.addNeighbours();
     }
-    addNeighbours(currentItem, currentLevel) {
+    pointBelongCircle(point) {
+        for (let item of this.items.values()) {
+            // (x – a)^2 + (y – b)^2 ≤ r^2, (a,b) center of circle, r - radius
+            if (Math.pow(point.x - item.center.x, 2) + Math.pow(point.y - item.center.y, 2) <= Math.pow(this.size, 2)) {
+                return item;
+            }
+        }
+        return null;
+    }
+    addItem(point) {
+        let item;
+        if (!this.items.has(point.json())) {
+            item = new Item(point);
+            this.items.set(point.json(), item);
+        }
+        else {
+            item = this.items.get(point.json());
+        }
+        return item;
+    }
+    buildLevel(currentItem, currentLevel) {
         currentLevel++;
         if (currentLevel > this.levelCount) {
             return;
         }
         for (let x = 0; x < 6; x++) {
-            let center = new Point(currentItem.center.x + this.size * this.orientation.getOffsetX(x), currentItem.center.y + this.size * this.orientation.getOffsetY(x));
-            let neighbour = new Item(center);
-            this.items.push(neighbour);
-            this.addNeighbours(neighbour, currentLevel);
+            let center = this.getPointWithOffset(currentItem.center, x);
+            let neighbour = this.addItem(center);
+            this.buildLevel(neighbour, currentLevel);
+        }
+    }
+    getPointWithOffset(point, angle) {
+        return new Point(+((point.x + this.size * this.orientation.getOffsetX(angle)).toFixed(2)), +((point.y + this.size * this.orientation.getOffsetY(angle)).toFixed(2)));
+    }
+    addNeighbours() {
+        for (let item of this.items.values()) {
+            for (let x = 0; x < 6; x++) {
+                let center = this.getPointWithOffset(item.center, x);
+                if (this.items.has(center.json())) {
+                    item.neighbours.set(x, this.items.get(center.json()));
+                }
+            }
         }
     }
 }
@@ -101,55 +167,13 @@ class Canvas {
         this.canvas.width = 1000;
         this.context.scale(dpr, dpr);
     }
-    drawCircle(point, radius) {
+    drawCircle(point, radius, fill = false) {
         this.context.beginPath();
         this.context.arc(point.x, point.y, radius, 0, Math.PI * 2);
-        // this.context.fill();
+        if (fill) {
+            this.context.fill();
+        }
         this.context.stroke();
     }
 }
-var layout = new Layout(20, 5, Orientation.pointy);
-class Hexagon {
-    constructor(size, x, y, orientation) {
-        this.x = x;
-        this.y = y;
-        this.size = size;
-        this.orientation = orientation;
-    }
-    isFlat() {
-        return this.orientation == Orientation.FLAT;
-    }
-    getWidth() {
-        return this.isFlat() ? 2 * this.size : Math.sqrt(3) * this.size;
-    }
-    getHeight() {
-        return this.isFlat() ? Math.sqrt(3) * this.size : 2 * this.size;
-    }
-    draw(context) {
-        const halfWidth = this.getWidth();
-        const halfHeight = this.getHeight();
-        const halfSize = this.size;
-        const isFlat = this.isFlat();
-        const x1 = isFlat ? this.x - this.size : this.x;
-        const x2 = isFlat ? this.x - halfSize : this.x + halfWidth;
-        const x3 = isFlat ? this.x + halfSize : x2;
-        const x4 = isFlat ? this.x + this.size : x1;
-        const x5 = isFlat ? x3 : this.x - halfWidth;
-        const x6 = isFlat ? x2 : x5;
-        const y1 = isFlat ? this.y : this.y - this.size;
-        const y2 = isFlat ? this.y - halfHeight : this.y - halfSize;
-        const y3 = isFlat ? y2 : this.y + halfSize;
-        const y4 = isFlat ? y1 : this.y + this.size;
-        const y5 = isFlat ? this.y + halfHeight : y3;
-        const y6 = isFlat ? y5 : y2;
-        context.beginPath();
-        context.moveTo(x1, y1);
-        context.lineTo(x2, y2);
-        context.lineTo(x3, y3);
-        context.lineTo(x4, y4);
-        context.lineTo(x5, y5);
-        context.lineTo(x6, y6);
-        context.lineTo(x1, y1);
-        context.stroke();
-    }
-}
+var layout = new Layout(20, 2, Orientation.pointy);
