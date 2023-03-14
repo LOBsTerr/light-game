@@ -5,34 +5,44 @@ class OffsetValue {
         this.y = y;
     }
 }
+class Pattern {
+    constructor(pattern, allowOnCorners = true, allowedOnSides = true) {
+        this.pattern = pattern;
+        this.allowOnCorners = allowOnCorners;
+        this.allowedOnSides = allowedOnSides;
+        if (pattern.length > Layout.anglesCount) {
+            throw Error(`Pattern can contain only {Layout.anglesCount} items`);
+        }
+    }
+}
 class Orientation {
     constructor(orientation = Orientation.flat) {
         this.orientation = orientation;
-        this.angles = new Map();
+        this.offsets = new Map();
         if (this.isFlat()) {
-            this.angles.set(0, new OffsetValue(-2, 0));
-            this.angles.set(1, new OffsetValue(-1, Math.sqrt(3)));
-            this.angles.set(2, new OffsetValue(1, Math.sqrt(3)));
-            this.angles.set(3, new OffsetValue(2, 0));
-            this.angles.set(4, new OffsetValue(1, -Math.sqrt(3)));
-            this.angles.set(5, new OffsetValue(-1, -Math.sqrt(3)));
+            this.offsets.set(0, new OffsetValue(-2, 0));
+            this.offsets.set(1, new OffsetValue(-1, Math.sqrt(3)));
+            this.offsets.set(2, new OffsetValue(1, Math.sqrt(3)));
+            this.offsets.set(3, new OffsetValue(2, 0));
+            this.offsets.set(4, new OffsetValue(1, -Math.sqrt(3)));
+            this.offsets.set(5, new OffsetValue(-1, -Math.sqrt(3)));
         }
         else {
-            this.angles.set(0, new OffsetValue(0, 2));
-            this.angles.set(1, new OffsetValue(Math.sqrt(3), -1));
-            this.angles.set(2, new OffsetValue(Math.sqrt(3), 1));
-            this.angles.set(3, new OffsetValue(0, -2));
-            this.angles.set(4, new OffsetValue(-Math.sqrt(3), -1));
-            this.angles.set(5, new OffsetValue(-Math.sqrt(3), 1));
+            this.offsets.set(0, new OffsetValue(0, 2));
+            this.offsets.set(1, new OffsetValue(Math.sqrt(3), -1));
+            this.offsets.set(2, new OffsetValue(Math.sqrt(3), 1));
+            this.offsets.set(3, new OffsetValue(0, -2));
+            this.offsets.set(4, new OffsetValue(-Math.sqrt(3), -1));
+            this.offsets.set(5, new OffsetValue(-Math.sqrt(3), 1));
         }
     }
     getOffsetX(angle) {
         var _a;
-        return ((_a = this.angles.get(angle)) === null || _a === void 0 ? void 0 : _a.x) || 0;
+        return ((_a = this.offsets.get(angle)) === null || _a === void 0 ? void 0 : _a.x) || 0;
     }
     getOffsetY(angle) {
         var _a;
-        return ((_a = this.angles.get(angle)) === null || _a === void 0 ? void 0 : _a.y) || 0;
+        return ((_a = this.offsets.get(angle)) === null || _a === void 0 ? void 0 : _a.y) || 0;
     }
     isFlat() {
         return this.orientation == Orientation.flat;
@@ -61,6 +71,19 @@ class Layout {
         this.levelCount = levelCount;
         this.items = new Map();
         this.canvas = new Canvas();
+        this.patterns = [
+            new Pattern([1, 0, 0, 0, 0, 0]),
+            new Pattern([1, 1, 0, 0, 0, 0]),
+            new Pattern([1, 0, 1, 0, 0, 0]),
+            new Pattern([1, 0, 0, 1, 0, 0], false, true),
+            new Pattern([1, 1, 1, 0, 0, 0], true, false),
+            new Pattern([1, 0, 1, 1, 0, 0], false, true),
+            new Pattern([1, 1, 1, 1, 0, 0], false, true),
+            new Pattern([1, 1, 1, 1, 1, 0], false, false),
+            new Pattern([1, 0, 1, 1, 0, 1], false, false),
+            new Pattern([1, 1, 0, 1, 0, 1], false, false),
+            new Pattern([1, 1, 1, 1, 1, 1], false, false),
+        ];
         this.contreAngles = {
             0: 3,
             1: 4,
@@ -102,6 +125,25 @@ class Layout {
     draw() {
         for (let item of this.items.values()) {
             this.canvas.drawCircle(item.center, this.size);
+            this.drawRandomPattern(item);
+        }
+    }
+    drawRandomPattern(item) {
+        let patterns = this.patterns;
+        // Item is conner, so we keep patterns for conners.
+        if (item.neighbours.size == 3) {
+            patterns = patterns.filter(pattern => pattern.allowOnCorners);
+        }
+        // Item is side, so we keep patterns for sides.
+        if (item.neighbours.size == 4) {
+            patterns = patterns.filter(pattern => pattern.allowedOnSides);
+        }
+        let pattern = patterns[Math.floor(Math.random() * patterns.length)];
+        for (let i = 0; i < pattern.pattern.length; i++) {
+            if (pattern.pattern[i] == 1) {
+                let offsetPoint = this.getPointWithOffset(item.center, i, false);
+                this.canvas.drawLine(item.center, offsetPoint);
+            }
         }
     }
     buildLevels() {
@@ -135,18 +177,20 @@ class Layout {
         if (currentLevel > this.levelCount) {
             return;
         }
-        for (let x = 0; x < 6; x++) {
+        for (let x = 0; x < Layout.anglesCount; x++) {
             let center = this.getPointWithOffset(currentItem.center, x);
             let neighbour = this.addItem(center);
             this.buildLevel(neighbour, currentLevel);
         }
     }
-    getPointWithOffset(point, angle) {
-        return new Point(+((point.x + this.size * this.orientation.getOffsetX(angle)).toFixed(2)), +((point.y + this.size * this.orientation.getOffsetY(angle)).toFixed(2)));
+    getPointWithOffset(point, angle, isCenter = true) {
+        // We keep only 2 decimal number precision.
+        let devider = isCenter ? 1 : 2;
+        return new Point(+((point.x + this.size * this.orientation.getOffsetX(angle) / devider).toFixed(2)), +((point.y + this.size * this.orientation.getOffsetY(angle) / devider).toFixed(2)));
     }
     addNeighbours() {
         for (let item of this.items.values()) {
-            for (let x = 0; x < 6; x++) {
+            for (let x = 0; x < Layout.anglesCount; x++) {
                 let center = this.getPointWithOffset(item.center, x);
                 if (this.items.has(center.json())) {
                     item.neighbours.set(x, this.items.get(center.json()));
@@ -155,6 +199,7 @@ class Layout {
         }
     }
 }
+Layout.anglesCount = 6;
 class Canvas {
     constructor() {
         this.canvas = document.getElementById("canvas");
@@ -175,5 +220,11 @@ class Canvas {
         }
         this.context.stroke();
     }
+    drawLine(start, end) {
+        this.context.beginPath();
+        this.context.moveTo(start.x, start.y);
+        this.context.lineTo(end.x, end.y);
+        this.context.stroke();
+    }
 }
-var layout = new Layout(20, 2, Orientation.pointy);
+var layout = new Layout(20, 3, Orientation.pointy);

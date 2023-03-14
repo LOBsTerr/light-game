@@ -2,37 +2,45 @@ class OffsetValue {
     constructor(public x: number, public y: number) {}
 }
 
+class Pattern {
+    constructor(public pattern: number[], public allowOnCorners: boolean = true, public allowedOnSides = true) {
+        if (pattern.length > Layout.anglesCount) {
+            throw Error(`Pattern can contain only {Layout.anglesCount} items`);
+        }
+    }
+}
+
 class Orientation {
     static readonly flat = 'flat';
     static readonly pointy = 'pointy';
 
-    protected angles: Map<number, OffsetValue> = new Map();
+    protected offsets: Map<number, OffsetValue> = new Map();
 
     constructor (public orientation: string = Orientation.flat) {
         if (this.isFlat()) {
-            this.angles.set(0, new OffsetValue(-2, 0));
-            this.angles.set(1, new OffsetValue(-1, Math.sqrt(3)));
-            this.angles.set(2, new OffsetValue(1, Math.sqrt(3)));
-            this.angles.set(3, new OffsetValue(2, 0));
-            this.angles.set(4, new OffsetValue(1, -Math.sqrt(3)));
-            this.angles.set(5, new OffsetValue(-1, -Math.sqrt(3)));
+            this.offsets.set(0, new OffsetValue(-2, 0));
+            this.offsets.set(1, new OffsetValue(-1, Math.sqrt(3)));
+            this.offsets.set(2, new OffsetValue(1, Math.sqrt(3)));
+            this.offsets.set(3, new OffsetValue(2, 0));
+            this.offsets.set(4, new OffsetValue(1, -Math.sqrt(3)));
+            this.offsets.set(5, new OffsetValue(-1, -Math.sqrt(3)));
         }
         else {           
-            this.angles.set(0, new OffsetValue(0, 2));
-            this.angles.set(1, new OffsetValue(Math.sqrt(3), -1));
-            this.angles.set(2, new OffsetValue(Math.sqrt(3), 1));
-            this.angles.set(3, new OffsetValue(0, -2));
-            this.angles.set(4, new OffsetValue(-Math.sqrt(3), -1));
-            this.angles.set(5, new OffsetValue(-Math.sqrt(3), 1));
+            this.offsets.set(0, new OffsetValue(0, 2));
+            this.offsets.set(1, new OffsetValue(Math.sqrt(3), -1));
+            this.offsets.set(2, new OffsetValue(Math.sqrt(3), 1));
+            this.offsets.set(3, new OffsetValue(0, -2));
+            this.offsets.set(4, new OffsetValue(-Math.sqrt(3), -1));
+            this.offsets.set(5, new OffsetValue(-Math.sqrt(3), 1));
         }
     }
 
     public getOffsetX(angle: number) {
-        return  this.angles.get(angle)?.x || 0;
+        return  this.offsets.get(angle)?.x || 0;
     }
 
     public getOffsetY(angle: number) {
-        return this.angles.get(angle)?.y || 0;
+        return this.offsets.get(angle)?.y || 0;
     }
 
     protected isFlat() {
@@ -54,21 +62,33 @@ class Item {
     constructor (public center: Point) {}
 }
 
-interface AssociativeArray {
-    [key: number]: number
- }
-
  interface Dictionary<Type> {
     [key: number]: Type;
  }
 
 class Layout {
+    public static readonly anglesCount: number = 6;
     protected orientation: Orientation;
     protected items: Map<string, Item> = new Map();
     protected canvas: Canvas = new Canvas();
     protected center: Point;
+
+    protected patterns: Pattern[] = [
+        new Pattern([1, 0, 0, 0, 0, 0]),
+        new Pattern([1, 1, 0, 0, 0, 0]),
+        new Pattern([1, 0, 1, 0, 0, 0]),
+        new Pattern([1, 0, 0, 1, 0, 0], false, true),
+        new Pattern([1, 1, 1, 0, 0, 0], true, false),
+        new Pattern([1, 0, 1, 1, 0, 0], false, true),
+        new Pattern([1, 1, 1, 1, 0, 0], false, true),
+        new Pattern([1, 1, 1, 1, 1, 0], false, false),
+        new Pattern([1, 0, 1, 1, 0, 1], false, false),
+        new Pattern([1, 1, 0, 1, 0, 1], false, false),
+        new Pattern([1, 1, 1, 1, 1, 1], false, false),
+    ];
+
     protected contreAngles:Dictionary<number> = {
-        0: 3,
+        0 : 3,
         1 : 4,
         2 : 5,
         3 : 0,
@@ -105,7 +125,7 @@ class Layout {
         this.draw();
     }
 
-    protected onClick(event: MouseEvent) {
+    protected onClick(event: MouseEvent): void {
         // Get canvas coordinates based on clicked point on the screen.
         const rect = this.canvas.canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
@@ -118,9 +138,32 @@ class Layout {
         }
     }
 
-    protected draw() {
+    protected draw(): void {
         for (let item of this.items.values()) {
             this.canvas.drawCircle(item.center, this.size);
+            this.drawRandomPattern(item);
+        }
+    }
+
+    protected drawRandomPattern(item: Item): void {
+        let patterns = this.patterns;
+        // Item is conner, so we keep patterns for conners.
+        if (item.neighbours.size == 3) {
+            patterns = patterns.filter(pattern => pattern.allowOnCorners);
+        }
+
+        // Item is side, so we keep patterns for sides.
+        if (item.neighbours.size == 4) {
+            patterns = patterns.filter(pattern => pattern.allowedOnSides);
+        }
+
+        let pattern: Pattern =  patterns[Math.floor(Math.random() * patterns.length)];
+
+        for (let i = 0; i < pattern.pattern.length; i++) {
+            if (pattern.pattern[i] == 1) {
+                let offsetPoint = this.getPointWithOffset(item.center, i, false);
+                this.canvas.drawLine(item.center, offsetPoint);
+            }
         }
     }
 
@@ -164,7 +207,7 @@ class Layout {
             return;
         }
         
-        for (let x: number = 0; x < 6; x++) {
+        for (let x: number = 0; x < Layout.anglesCount; x++) {
             
             let center = this.getPointWithOffset(currentItem.center, x);
 
@@ -174,16 +217,18 @@ class Layout {
         }
     }
 
-    protected getPointWithOffset(point: Point, angle: number):Point {
+    protected getPointWithOffset(point: Point, angle: number, isCenter: boolean = true): Point {
+        // We keep only 2 decimal number precision.
+        let devider = isCenter ? 1 : 2;
         return new Point(
-            +((point.x + this.size * this.orientation.getOffsetX(angle)).toFixed(2)),
-            +((point.y + this.size * this.orientation.getOffsetY(angle)).toFixed(2))
+            +((point.x + this.size * this.orientation.getOffsetX(angle) / devider).toFixed(2)),
+            +((point.y + this.size * this.orientation.getOffsetY(angle) / devider).toFixed(2))
         );
     }
         
-    protected addNeighbours() {
+    protected addNeighbours(): void {
         for (let item of this.items.values()) {
-            for (let x: number = 0; x < 6; x++) {
+            for (let x: number = 0; x < Layout.anglesCount; x++) {
             
                 let center = this.getPointWithOffset(item.center, x);
 
@@ -215,7 +260,7 @@ class Canvas {
         this.context.scale(dpr, dpr);
     }
 
-    drawCircle(point: Point, radius: number, fill: boolean = false) {
+    public drawCircle(point: Point, radius: number, fill: boolean = false): void {
         this.context.beginPath();
         this.context.arc(point.x, point.y, radius, 0, Math.PI * 2);
         if (fill) {
@@ -223,6 +268,13 @@ class Canvas {
         }
         this.context.stroke();
     }
+
+    public drawLine(start: Point, end: Point): void {
+        this.context.beginPath();
+        this.context.moveTo(start.x, start.y);
+        this.context.lineTo(end.x, end.y);
+        this.context.stroke();
+    }
 }
 
-var layout = new Layout(20, 2, Orientation.pointy);
+var layout = new Layout(20, 3, Orientation.pointy);
