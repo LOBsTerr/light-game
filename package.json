@@ -1,22 +1,26 @@
 {
-  "name": "hex",
+  "name": "light",
   "version": "1.0.0",
-  "description": "HEX",
+  "description": "Light",
   "main": "index.js",
   "scripts": {
-    "start": "tsc --watch"
+    "start": "tsc --watch",
+    "build": "npx webpack build"
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/LOBsTerr/hex.git"
+    "url": "git+ssh://git@github.com/LOBsTerr/light-game.git"
   },
   "author": "Nikolay Lobachev",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/LOBsTerr/hex/issues"
+    "url": "https://github.com/LOBsTerr/light-game/issues"
   },
-  "homepage": "https://github.com/LOBsTerr/hex#readme",
+  "homepage": "https://github.com/LOBsTerr/light-game#readme",
   "dependencies": {
-    "typescript": "^4.9.5"
+    "ts-loader": "^9.4.2",
+    "typescript": "^4.9.5",
+    "webpack": "^5.76.2",
+    "webpack-cli": "^5.0.1"
   }
 }
