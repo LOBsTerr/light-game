@@ -26,6 +26,15 @@ var __read = (this && this.__read) || function (o, n) {
     }
     return ar;
 };
+var __spreadArray = (this && this.__spreadArray) || function (to, from, pack) {
+    if (pack || arguments.length === 2) for (var i = 0, l = from.length, ar; i < l; i++) {
+        if (ar || !(i in from)) {
+            if (!ar) ar = Array.prototype.slice.call(from, 0, i);
+            ar[i] = from[i];
+        }
+    }
+    return to.concat(ar || Array.prototype.slice.call(from));
+};
 var Layout = /** @class */ (function () {
     function Layout(size, levelCount, orientation) {
         if (levelCount === void 0) { levelCount = 1; }
@@ -36,21 +45,7 @@ var Layout = /** @class */ (function () {
         this.items = new Map();
         this.graph = new Map();
         this.canvas = new Canvas();
-        this.path = new Stack();
         this.visited = new Set();
-        this.patterns = [
-            new Pattern([1, 0, 0, 0, 0, 0]),
-            new Pattern([1, 1, 0, 0, 0, 0]),
-            new Pattern([1, 0, 1, 0, 0, 0]),
-            new Pattern([1, 0, 0, 1, 0, 0], false, true),
-            new Pattern([1, 1, 1, 0, 0, 0], true, false),
-            new Pattern([1, 0, 1, 1, 0, 0], false, true),
-            new Pattern([1, 1, 1, 1, 0, 0], false, true),
-            new Pattern([1, 1, 1, 1, 1, 0], false, false),
-            new Pattern([1, 0, 1, 1, 0, 1], false, false),
-            new Pattern([1, 1, 0, 1, 0, 1], false, false),
-            new Pattern([1, 1, 1, 1, 1, 1], false, false),
-        ];
         this.contreAngles = {
             0: 3,
             1: 4,
@@ -67,30 +62,46 @@ var Layout = /** @class */ (function () {
             _this.onClick(event);
         };
         onClick.bind(this);
+        var onConextMenu = function (event) {
+            event.preventDefault();
+            var rect = _this.canvas.canvas.getBoundingClientRect();
+            var x = event.clientX - rect.left;
+            var y = event.clientY - rect.top;
+            // if we found the clicked circle redraw it.
+            var item = _this.pointBelongCircle(new Point(x, y));
+            if (item) {
+                switch (event.button) {
+                    case 2:
+                        _this.turnItem(item, 1, Layout.right);
+                        break;
+                }
+            }
+        };
+        onConextMenu.bind(this);
+        this.canvas.canvas.addEventListener('contextmenu', onConextMenu, false);
         this.canvas.canvas.addEventListener('click', onClick, false);
         this.center = new Point(this.canvas.canvas.width / 2, this.canvas.canvas.height / 2);
         this.center = new Point(this.canvas.canvas.width / 2, this.canvas.canvas.height / 2);
         this.buildLevels();
-        // console.log(this.items);
         this.buildGraph();
         this.draw();
-        // this.drawVisited();
-        // console.log(this.visited);
     }
-    Layout.prototype.drawVisited = function () {
+    Layout.prototype.buildGraph = function () {
+        this.graph = this.items;
+        var keys = Array.from(this.items.keys());
+        this.startItem = this.items.get(keys[this.getRandomValue(keys.length)]);
+        this.startItem.isMain = true;
+        this.buildGraphItems(this.startItem);
+        this.randomlyTurnItems();
+    };
+    Layout.prototype.randomlyTurnItems = function () {
         var e_1, _a;
-        this.canvas.context.beginPath();
-        var i = 1;
         try {
-            for (var _b = __values(this.visited), _c = _b.next(); !_c.done; _c = _b.next()) {
+            for (var _b = __values(Array.from(this.items.values())), _c = _b.next(); !_c.done; _c = _b.next()) {
                 var item = _c.value;
-                if (i == 1) {
-                    this.canvas.context.moveTo(item.center.x, item.center.y);
-                }
-                else {
-                    this.canvas.context.lineTo(item.center.x, item.center.y);
-                }
-                i++;
+                item.randomPattern = __spreadArray([], __read(item.pattern), false);
+                var randomValue = this.getRandomValue(5);
+                this.turnItem(item, randomValue, Layout.left);
             }
         }
         catch (e_1_1) { e_1 = { error: e_1_1 }; }
@@ -100,73 +111,47 @@ var Layout = /** @class */ (function () {
             }
             finally { if (e_1) throw e_1.error; }
         }
-        this.canvas.context.stroke();
-    };
-    Layout.prototype.buildGraph = function () {
-        this.graph = this.items;
-        var keys = Array.from(this.items.keys());
-        var startItem = this.items.get(keys[this.getRandomValue(keys.length)]);
-        this.path.push(startItem);
-        this.buildGraphItems(startItem);
     };
     Layout.prototype.buildGraphItems = function (item) {
-        console.log(item.center);
-        this.visited.add(item);
-        this.path.push(item);
-        var notVisited = this.getNotVisitedNeigbors(item);
-        if (notVisited.length > 0) {
-            var randomNeigbor = item.neighbors.get(notVisited[this.getRandomValue(notVisited.length)]);
-            this.canvas.drawCircle(randomNeigbor.center, this.size, false);
-            this.canvas.drawLine(item.center, randomNeigbor.center);
-            this.buildGraphItems(randomNeigbor);
-        }
-        else {
-            var stackItem = this.path.pop();
-            notVisited = this.getNotVisitedNeigbors(stackItem);
-            if (notVisited.length == 0) {
-                // todo: we need to refactor the structure, in order remove processed neighbors.
-                while (this.path.size() > 0 && notVisited.length == 0) {
-                    stackItem = this.path.pop();
-                    notVisited = this.getNotVisitedNeigbors(stackItem);
-                }
-            }
-            if (notVisited.length > 0) {
-                var randomNeigbor = stackItem.neighbors.get(notVisited[this.getRandomValue(notVisited.length)]);
-                this.canvas.drawCircle(randomNeigbor.center, this.size, false);
-                this.canvas.drawLine(stackItem.center, randomNeigbor.center);
-                this.buildGraphItems(randomNeigbor);
-            }
-        }
-        return;
-    };
-    Layout.prototype.getNotVisitedNeigbors = function (item) {
         var e_2, _a;
-        var notVisited = [];
+        if (this.visited.has(item)) {
+            return;
+        }
+        this.visited.add(item);
+        this.visited.add(item);
+        var neighborsKeys = this.shuffle(Array.from(item.neighbors.keys()));
         try {
-            // Collect not visited neighbors.
-            for (var _b = __values(item.neighbors.entries()), _c = _b.next(); !_c.done; _c = _b.next()) {
-                var _d = __read(_c.value, 2), key = _d[0], neighbor = _d[1];
+            for (var neighborsKeys_1 = __values(neighborsKeys), neighborsKeys_1_1 = neighborsKeys_1.next(); !neighborsKeys_1_1.done; neighborsKeys_1_1 = neighborsKeys_1.next()) {
+                var key = neighborsKeys_1_1.value;
+                var neighbor = item.neighbors.get(key);
                 if (!this.visited.has(neighbor)) {
-                    notVisited.push(key);
+                    item.pattern[key] = 1;
+                    neighbor.pattern[this.contreAngles[key]] = 1;
+                    this.buildGraphItems(neighbor);
                 }
             }
         }
         catch (e_2_1) { e_2 = { error: e_2_1 }; }
         finally {
             try {
-                if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+                if (neighborsKeys_1_1 && !neighborsKeys_1_1.done && (_a = neighborsKeys_1.return)) _a.call(neighborsKeys_1);
             }
             finally { if (e_2) throw e_2.error; }
         }
-        return notVisited;
     };
-    Layout.prototype.draw = function () {
+    Layout.prototype.getActivePath = function (item) {
         var e_3, _a;
+        if (this.visited.has(item)) {
+            return;
+        }
+        this.visited.add(item);
         try {
-            for (var _b = __values(this.items.values()), _c = _b.next(); !_c.done; _c = _b.next()) {
-                var item = _c.value;
-                this.canvas.drawCircle(item.center, this.size, false);
-                // this.drawRandomPattern(item);
+            for (var _b = __values(item.neighbors.entries()), _c = _b.next(); !_c.done; _c = _b.next()) {
+                var _d = __read(_c.value, 2), key = _d[0], neighbor = _d[1];
+                if (this.hasConnectedItem(item, neighbor, key)) {
+                    this.drawItem(item, true);
+                    this.getActivePath(neighbor);
+                }
             }
         }
         catch (e_3_1) { e_3 = { error: e_3_1 }; }
@@ -176,6 +161,46 @@ var Layout = /** @class */ (function () {
             }
             finally { if (e_3) throw e_3.error; }
         }
+    };
+    Layout.prototype.hasConnectedItem = function (item, neighbor, angle) {
+        if (item.randomPattern[angle] &&
+            item.randomPattern[angle] == 1 &&
+            neighbor.randomPattern[this.contreAngles[angle]] &&
+            neighbor.randomPattern[this.contreAngles[angle]] == 1) {
+            return true;
+        }
+        return false;
+    };
+    Layout.prototype.draw = function () {
+        var e_4, _a;
+        this.canvas.clear();
+        try {
+            for (var _b = __values(this.items.values()), _c = _b.next(); !_c.done; _c = _b.next()) {
+                var item = _c.value;
+                this.drawItem(item);
+            }
+        }
+        catch (e_4_1) { e_4 = { error: e_4_1 }; }
+        finally {
+            try {
+                if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+            }
+            finally { if (e_4) throw e_4.error; }
+        }
+        this.visited.clear();
+        this.getActivePath(this.startItem);
+    };
+    Layout.prototype.drawItem = function (item, highlightItem) {
+        if (highlightItem === void 0) { highlightItem = false; }
+        for (var key in item.randomPattern) {
+            // this.canvas.drawCircle(item.center, this.size, false);
+            if (item.randomPattern[key] == 1) {
+                var offsetPoint = this.getPointWithOffset(item.center, Number(key), false);
+                var color = highlightItem || item.isMain ? 'red' : 'black';
+                this.canvas.drawLine(item.center, offsetPoint, color);
+            }
+        }
+        this.canvas.drawCircle(item.center, 3, true);
     };
     Layout.prototype.getRandomValue = function (length) {
         return Math.floor(Math.random() * length);
@@ -187,7 +212,7 @@ var Layout = /** @class */ (function () {
         this.addNeighbors();
     };
     Layout.prototype.pointBelongCircle = function (point) {
-        var e_4, _a;
+        var e_5, _a;
         try {
             for (var _b = __values(this.items.values()), _c = _b.next(); !_c.done; _c = _b.next()) {
                 var item = _c.value;
@@ -197,12 +222,12 @@ var Layout = /** @class */ (function () {
                 }
             }
         }
-        catch (e_4_1) { e_4 = { error: e_4_1 }; }
+        catch (e_5_1) { e_5 = { error: e_5_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
             }
-            finally { if (e_4) throw e_4.error; }
+            finally { if (e_5) throw e_5.error; }
         }
         return null;
     };
@@ -218,16 +243,34 @@ var Layout = /** @class */ (function () {
         }
         return item;
     };
+    Layout.prototype.turnItem = function (item, shift, direction) {
+        item.randomPattern = this.shift(item.randomPattern, shift, direction);
+        this.draw();
+    };
     Layout.prototype.buildLevel = function (currentItem, currentLevel) {
         currentLevel++;
         if (currentLevel > this.levelCount) {
             return;
         }
+        // Run through all angles to build neighbors.
         for (var x = 0; x < Layout.anglesCount; x++) {
             var center = this.getPointWithOffset(currentItem.center, x);
             var neighbor = this.addItem(center);
             this.buildLevel(neighbor, currentLevel);
         }
+    };
+    Layout.prototype.shift = function (list, shift, direction) {
+        for (var i = 0; i < shift; i++) {
+            if (direction == Layout.left) {
+                var item = list.pop();
+                list.unshift(item);
+            }
+            else {
+                var item = list.shift();
+                list.push(item);
+            }
+        }
+        return list;
     };
     Layout.prototype.getPointWithOffset = function (point, angle, isCenter) {
         if (isCenter === void 0) { isCenter = true; }
@@ -236,7 +279,7 @@ var Layout = /** @class */ (function () {
         return new Point(+((point.x + this.size * this.orientation.getOffsetX(angle) / devider).toFixed(2)), +((point.y + this.size * this.orientation.getOffsetY(angle) / devider).toFixed(2)));
     };
     Layout.prototype.addNeighbors = function () {
-        var e_5, _a;
+        var e_6, _a;
         try {
             for (var _b = __values(this.items.values()), _c = _b.next(); !_c.done; _c = _b.next()) {
                 var item = _c.value;
@@ -248,30 +291,12 @@ var Layout = /** @class */ (function () {
                 }
             }
         }
-        catch (e_5_1) { e_5 = { error: e_5_1 }; }
+        catch (e_6_1) { e_6 = { error: e_6_1 }; }
         finally {
             try {
                 if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
             }
-            finally { if (e_5) throw e_5.error; }
-        }
-    };
-    Layout.prototype.drawRandomPattern = function (item) {
-        var patterns = this.patterns;
-        // Item is conner, so we keep patterns for conners.
-        if (item.neighbors.size == 3) {
-            patterns = patterns.filter(function (pattern) { return pattern.allowOnCorners; });
-        }
-        // Item is side, so we keep patterns for sides.
-        if (item.neighbors.size == 4) {
-            patterns = patterns.filter(function (pattern) { return pattern.allowedOnSides; });
-        }
-        var pattern = patterns[this.getRandomValue(patterns.length)];
-        for (var i = 0; i < pattern.pattern.length; i++) {
-            if (pattern.pattern[i] == 1) {
-                var offsetPoint = this.getPointWithOffset(item.center, i, false);
-                this.canvas.drawLine(item.center, offsetPoint);
-            }
+            finally { if (e_6) throw e_6.error; }
         }
     };
     Layout.prototype.onClick = function (event) {
@@ -282,10 +307,31 @@ var Layout = /** @class */ (function () {
         // if we found the clicked circle redraw it.
         var item = this.pointBelongCircle(new Point(x, y));
         if (item) {
-            console.log(item.center.json());
-            // this.canvas.drawCircle(item.center, this.size, true);
+            switch (event.button) {
+                case 0:
+                    this.turnItem(item, 1, Layout.left);
+                    break;
+            }
         }
     };
+    Layout.prototype.shuffle = function (array) {
+        var copy = [];
+        var n = array.length, i;
+        // While there remain elements to shuffle.
+        while (n) {
+            // Pick a remaining element.
+            i = Math.floor(Math.random() * array.length);
+            // If not already shuffled, move it to the new array.
+            if (i in array) {
+                copy.push(array[i]);
+                delete array[i];
+                n--;
+            }
+        }
+        return copy;
+    };
+    Layout.left = 'left';
+    Layout.right = 'right';
     Layout.anglesCount = 6;
     return Layout;
 }());
@@ -303,9 +349,13 @@ var Pattern = /** @class */ (function () {
     return Pattern;
 }());
 var Item = /** @class */ (function () {
-    function Item(center) {
+    function Item(center, isMain) {
+        if (isMain === void 0) { isMain = false; }
         this.center = center;
+        this.isMain = isMain;
         this.neighbors = new Map();
+        this.pattern = [0, 0, 0, 0, 0, 0];
+        this.randomPattern = [0, 0, 0, 0, 0, 0];
     }
     return Item;
 }());
@@ -322,28 +372,40 @@ var Canvas = /** @class */ (function () {
         this.canvas.width = 1000;
         this.context.scale(dpr, dpr);
     }
-    Canvas.prototype.drawCircle = function (point, radius, fill) {
+    Canvas.prototype.drawCircle = function (point, radius, fill, color) {
         if (fill === void 0) { fill = false; }
+        if (color === void 0) { color = 'grey'; }
         this.context.beginPath();
-        var colors = ['red', 'green', 'blue', 'white', 'black', 'purple', 'yellow'];
-        if (this.i == colors.length) {
-            this.i = 0;
-        }
-        else {
-            this.i++;
-        }
-        this.context.fillStyle = colors[this.i];
+        this.context.fillStyle = color;
+        // this.context.strokeStyle = 'green';
         this.context.arc(point.x, point.y, radius, 0, Math.PI * 2);
         if (fill) {
             this.context.fill();
         }
+        this.context.lineWidth = 0;
         this.context.stroke();
     };
-    Canvas.prototype.drawLine = function (start, end) {
+    Canvas.prototype.drawLine = function (start, end, color) {
+        if (color === void 0) { color = 'black'; }
         this.context.beginPath();
         this.context.moveTo(start.x, start.y);
         this.context.lineTo(end.x, end.y);
+        this.context.strokeStyle = color;
+        this.context.fillStyle = color;
+        this.context.lineWidth = 5;
         this.context.stroke();
+        this.context.strokeStyle = 'black';
+        this.context.fillStyle = 'black';
+        this.context.lineWidth = 1;
+    };
+    Canvas.prototype.clear = function () {
+        var gradient = this.context.createLinearGradient(0, 0, this.canvas.width, 0);
+        gradient.addColorStop(0, "#e8e6df");
+        gradient.addColorStop(0.5, "#e6e1d3");
+        gradient.addColorStop(1, "#e8e6df");
+        this.context.fillStyle = gradient;
+        this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        // this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     };
     return Canvas;
 }());
@@ -364,19 +426,19 @@ var Orientation = /** @class */ (function () {
         this.offsets = new Map();
         if (this.isFlat()) {
             this.offsets.set(0, new OffsetValue(-2, 0));
-            this.offsets.set(1, new OffsetValue(-1, Math.sqrt(3)));
-            this.offsets.set(2, new OffsetValue(1, Math.sqrt(3)));
+            this.offsets.set(1, new OffsetValue(-1, -Math.sqrt(3)));
+            this.offsets.set(2, new OffsetValue(1, -Math.sqrt(3)));
             this.offsets.set(3, new OffsetValue(2, 0));
-            this.offsets.set(4, new OffsetValue(1, -Math.sqrt(3)));
-            this.offsets.set(5, new OffsetValue(-1, -Math.sqrt(3)));
+            this.offsets.set(4, new OffsetValue(1, Math.sqrt(3)));
+            this.offsets.set(5, new OffsetValue(-1, Math.sqrt(3)));
         }
         else {
-            this.offsets.set(0, new OffsetValue(0, 2));
+            this.offsets.set(0, new OffsetValue(0, -2));
             this.offsets.set(1, new OffsetValue(Math.sqrt(3), -1));
             this.offsets.set(2, new OffsetValue(Math.sqrt(3), 1));
-            this.offsets.set(3, new OffsetValue(0, -2));
-            this.offsets.set(4, new OffsetValue(-Math.sqrt(3), -1));
-            this.offsets.set(5, new OffsetValue(-Math.sqrt(3), 1));
+            this.offsets.set(3, new OffsetValue(0, 2));
+            this.offsets.set(4, new OffsetValue(-Math.sqrt(3), 1));
+            this.offsets.set(5, new OffsetValue(-Math.sqrt(3), -1));
         }
     }
     Orientation.prototype.getOffsetX = function (angle) {
@@ -401,27 +463,4 @@ var OffsetValue = /** @class */ (function () {
     }
     return OffsetValue;
 }());
-var Stack = /** @class */ (function () {
-    function Stack(capacity) {
-        if (capacity === void 0) { capacity = Infinity; }
-        this.capacity = capacity;
-        this.storage = [];
-    }
-    Stack.prototype.push = function (item) {
-        if (this.size() === this.capacity) {
-            throw Error("Stack has reached max capacity, you cannot add more items");
-        }
-        this.storage.push(item);
-    };
-    Stack.prototype.pop = function () {
-        return this.storage.pop();
-    };
-    Stack.prototype.peek = function () {
-        return this.storage[this.size() - 1];
-    };
-    Stack.prototype.size = function () {
-        return this.storage.length;
-    };
-    return Stack;
-}());
-var layout = new Layout(20, 4, Orientation.pointy);
+var layout = new Layout(20, 5, Orientation.pointy);
