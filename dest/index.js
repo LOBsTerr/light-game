@@ -39,11 +39,9 @@ var Layout = /** @class */ (function () {
     function Layout(size, levelCount, orientation) {
         if (levelCount === void 0) { levelCount = 1; }
         if (orientation === void 0) { orientation = Orientation.flat; }
-        var _this = this;
         this.size = size;
         this.levelCount = levelCount;
         this.items = new Map();
-        this.graph = new Map();
         this.canvas = new Canvas();
         this.visited = new Set();
         this.contreAngles = {
@@ -58,36 +56,27 @@ var Layout = /** @class */ (function () {
         if (this.levelCount < 1) {
             throw Error("Level count should be bigger than 0.");
         }
-        var onClick = function (event) {
-            _this.onClick(event);
-        };
-        onClick.bind(this);
-        var onConextMenu = function (event) {
-            event.preventDefault();
-            var rect = _this.canvas.canvas.getBoundingClientRect();
-            var x = event.clientX - rect.left;
-            var y = event.clientY - rect.top;
-            // if we found the clicked circle redraw it.
-            var item = _this.pointBelongCircle(new Point(x, y));
-            if (item) {
-                switch (event.button) {
-                    case 2:
-                        _this.turnItem(item, 1, Layout.right);
-                        break;
-                }
-            }
-        };
-        onConextMenu.bind(this);
-        this.canvas.canvas.addEventListener('contextmenu', onConextMenu, false);
-        this.canvas.canvas.addEventListener('click', onClick, false);
         this.center = new Point(this.canvas.canvas.width / 2, this.canvas.canvas.height / 2);
         this.center = new Point(this.canvas.canvas.width / 2, this.canvas.canvas.height / 2);
+        this.defineMouseListeners();
         this.buildLevels();
         this.buildGraph();
         this.draw();
     }
+    Layout.prototype.defineMouseListeners = function () {
+        var _this = this;
+        var onLeftClick = function (event) {
+            _this.onLeftClick(event);
+        };
+        onLeftClick.bind(this);
+        this.canvas.canvas.addEventListener('click', onLeftClick, false);
+        var onRightClick = function (event) {
+            _this.onRightClick(event);
+        };
+        onRightClick.bind(this);
+        this.canvas.canvas.addEventListener('contextmenu', onRightClick, false);
+    };
     Layout.prototype.buildGraph = function () {
-        this.graph = this.items;
         var keys = Array.from(this.items.keys());
         this.startItem = this.items.get(keys[this.getRandomValue(keys.length)]);
         this.startItem.isMain = true;
@@ -299,18 +288,35 @@ var Layout = /** @class */ (function () {
             finally { if (e_6) throw e_6.error; }
         }
     };
-    Layout.prototype.onClick = function (event) {
-        // Get canvas coordinates based on clicked point on the screen.
+    Layout.prototype.onLeftClick = function (event) {
+        var item = this.pointBelongCircle(this.getCanvasClickedPoint(event));
+        if (item) {
+            if (event.button == 0) {
+                this.turnItem(item, 1, Layout.left);
+            }
+        }
+    };
+    /**
+     * Get canvas coordinates based on clicked point on the screen.
+     *
+     * @param MouseEvent event
+     *   Moust event.
+     *
+     * @returns
+     *   Point on canvas where user clicked.
+     */
+    Layout.prototype.getCanvasClickedPoint = function (event) {
         var rect = this.canvas.canvas.getBoundingClientRect();
         var x = event.clientX - rect.left;
         var y = event.clientY - rect.top;
-        // if we found the clicked circle redraw it.
-        var item = this.pointBelongCircle(new Point(x, y));
+        return new Point(x, y);
+    };
+    Layout.prototype.onRightClick = function (event) {
+        event.preventDefault();
+        var item = this.pointBelongCircle(this.getCanvasClickedPoint(event));
         if (item) {
-            switch (event.button) {
-                case 0:
-                    this.turnItem(item, 1, Layout.left);
-                    break;
+            if (event.button == 2) {
+                this.turnItem(item, 1, Layout.right);
             }
         }
     };
@@ -377,7 +383,6 @@ var Canvas = /** @class */ (function () {
         if (color === void 0) { color = 'grey'; }
         this.context.beginPath();
         this.context.fillStyle = color;
-        // this.context.strokeStyle = 'green';
         this.context.arc(point.x, point.y, radius, 0, Math.PI * 2);
         if (fill) {
             this.context.fill();
@@ -405,7 +410,6 @@ var Canvas = /** @class */ (function () {
         gradient.addColorStop(1, "#e8e6df");
         this.context.fillStyle = gradient;
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        // this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     };
     return Canvas;
 }());
@@ -424,21 +428,22 @@ var Orientation = /** @class */ (function () {
         if (orientation === void 0) { orientation = Orientation.flat; }
         this.orientation = orientation;
         this.offsets = new Map();
+        var sqrtOfThree = Math.sqrt(3);
         if (this.isFlat()) {
             this.offsets.set(0, new OffsetValue(-2, 0));
-            this.offsets.set(1, new OffsetValue(-1, -Math.sqrt(3)));
-            this.offsets.set(2, new OffsetValue(1, -Math.sqrt(3)));
+            this.offsets.set(1, new OffsetValue(-1, -sqrtOfThree));
+            this.offsets.set(2, new OffsetValue(1, -sqrtOfThree));
             this.offsets.set(3, new OffsetValue(2, 0));
-            this.offsets.set(4, new OffsetValue(1, Math.sqrt(3)));
-            this.offsets.set(5, new OffsetValue(-1, Math.sqrt(3)));
+            this.offsets.set(4, new OffsetValue(1, sqrtOfThree));
+            this.offsets.set(5, new OffsetValue(-1, sqrtOfThree));
         }
         else {
             this.offsets.set(0, new OffsetValue(0, -2));
-            this.offsets.set(1, new OffsetValue(Math.sqrt(3), -1));
-            this.offsets.set(2, new OffsetValue(Math.sqrt(3), 1));
+            this.offsets.set(1, new OffsetValue(sqrtOfThree, -1));
+            this.offsets.set(2, new OffsetValue(sqrtOfThree, 1));
             this.offsets.set(3, new OffsetValue(0, 2));
-            this.offsets.set(4, new OffsetValue(-Math.sqrt(3), 1));
-            this.offsets.set(5, new OffsetValue(-Math.sqrt(3), -1));
+            this.offsets.set(4, new OffsetValue(-sqrtOfThree, 1));
+            this.offsets.set(5, new OffsetValue(-sqrtOfThree, -1));
         }
     }
     Orientation.prototype.getOffsetX = function (angle) {
@@ -463,4 +468,4 @@ var OffsetValue = /** @class */ (function () {
     }
     return OffsetValue;
 }());
-var layout = new Layout(20, 5, Orientation.pointy);
+var layout = new Layout(20, 5, Orientation.flat);

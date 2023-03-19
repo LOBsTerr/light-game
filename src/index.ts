@@ -5,7 +5,6 @@ class Layout {
     protected orientation: Orientation;
     protected center: Point;
     protected items: Map<string, Item> = new Map();
-    protected graph: Map<string, Item> = new Map();
     protected canvas: Canvas = new Canvas();
     protected visited: Set<Item> = new Set();
     protected startItem: Item;
@@ -29,43 +28,34 @@ class Layout {
             throw Error("Level count should be bigger than 0.");
         }
 
-        let onClick = (event: MouseEvent) => {
-            this.onClick(event)
-        }
-        onClick.bind(this);
-
-        let onConextMenu = (event: MouseEvent) => {
-            event.preventDefault();
-            const rect = this.canvas.canvas.getBoundingClientRect();
-            const x = event.clientX - rect.left;
-            const y = event.clientY - rect.top;
-
-            // if we found the clicked circle redraw it.
-            let item = this.pointBelongCircle(new Point(x, y));
-            if (item) {
-                switch (event.button) {
-                    case 2:
-                        this.turnItem(item, 1, Layout.right);
-                        break;
-
-                }
-            }
-        }
-        onConextMenu.bind(this);
-
-        this.canvas.canvas.addEventListener('contextmenu', onConextMenu, false);
-        this.canvas.canvas.addEventListener('click', onClick, false);
-
         this.center = new Point(this.canvas.canvas.width / 2, this.canvas.canvas.height / 2);
         this.center = new Point(this.canvas.canvas.width / 2, this.canvas.canvas.height / 2);
+
+        this.defineMouseListeners();
 
         this.buildLevels();
         this.buildGraph();
         this.draw();
     }
 
+    protected defineMouseListeners() {
+
+        let onLeftClick = (event: MouseEvent) => {
+            this.onLeftClick(event)
+        }
+        onLeftClick.bind(this);
+
+        this.canvas.canvas.addEventListener('click', onLeftClick, false);
+
+        let onRightClick = (event: MouseEvent) => {
+            this.onRightClick(event);
+        }
+        onRightClick.bind(this);
+
+        this.canvas.canvas.addEventListener('contextmenu', onRightClick, false);
+    }
+
     protected buildGraph(): void {
-        this.graph = this.items;
         let keys = Array.from(this.items.keys());
         this.startItem = this.items.get(keys[this.getRandomValue(keys.length)]) as Item;
         this.startItem.isMain = true;
@@ -250,20 +240,39 @@ class Layout {
         }
     }
 
-    protected onClick(event: MouseEvent): void {
-        // Get canvas coordinates based on clicked point on the screen.
+    protected onLeftClick(event: MouseEvent): void {
+        let item = this.pointBelongCircle(this.getCanvasClickedPoint(event));
+        if (item) {
+            if (event.button == 0) {
+                this.turnItem(item, 1, Layout.left);
+            }
+        }
+    }
+
+    /**
+     * Get canvas coordinates based on clicked point on the screen.
+     *
+     * @param MouseEvent event
+     *   Moust event.
+     *
+     * @returns
+     *   Point on canvas where user clicked.
+     */
+    protected getCanvasClickedPoint(event: MouseEvent): Point {
         const rect = this.canvas.canvas.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
 
-        // if we found the clicked circle redraw it.
-        let item = this.pointBelongCircle(new Point(x, y));
-        if (item) {
-            switch (event.button) {
-                case 0:
-                    this.turnItem(item, 1, Layout.left);
-                    break;
+        return new Point(x, y);
+    }
 
+    protected onRightClick(event: MouseEvent): void {
+        event.preventDefault();
+
+        let item = this.pointBelongCircle(this.getCanvasClickedPoint(event));
+        if (item) {
+            if (event.button == 2) {
+                this.turnItem(item, 1, Layout.right);
             }
         }
     }
@@ -333,7 +342,6 @@ class Canvas {
     public drawCircle(point: Point, radius: number, fill: boolean = false, color: string = 'grey'): void {
         this.context.beginPath();
         this.context.fillStyle = color;
-        // this.context.strokeStyle = 'green';
         this.context.arc(point.x, point.y, radius, 0, Math.PI * 2);
         if (fill) {
             this.context.fill();
@@ -364,7 +372,6 @@ class Canvas {
 
         this.context.fillStyle = gradient;
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        // this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
     }
 
 }
@@ -384,21 +391,22 @@ class Orientation {
     protected offsets: Map<number, OffsetValue> = new Map();
 
     constructor(public orientation: string = Orientation.flat) {
+        let sqrtOfThree = Math.sqrt(3);
         if (this.isFlat()) {
             this.offsets.set(0, new OffsetValue(-2, 0));
-            this.offsets.set(1, new OffsetValue(-1, -Math.sqrt(3)));
-            this.offsets.set(2, new OffsetValue(1, -Math.sqrt(3)));
+            this.offsets.set(1, new OffsetValue(-1, -sqrtOfThree));
+            this.offsets.set(2, new OffsetValue(1, -sqrtOfThree));
             this.offsets.set(3, new OffsetValue(2, 0));
-            this.offsets.set(4, new OffsetValue(1, Math.sqrt(3)));
-            this.offsets.set(5, new OffsetValue(-1, Math.sqrt(3)));
+            this.offsets.set(4, new OffsetValue(1, sqrtOfThree));
+            this.offsets.set(5, new OffsetValue(-1, sqrtOfThree));
         }
         else {
             this.offsets.set(0, new OffsetValue(0, -2));
-            this.offsets.set(1, new OffsetValue(Math.sqrt(3), -1));
-            this.offsets.set(2, new OffsetValue(Math.sqrt(3), 1));
+            this.offsets.set(1, new OffsetValue(sqrtOfThree, -1));
+            this.offsets.set(2, new OffsetValue(sqrtOfThree, 1));
             this.offsets.set(3, new OffsetValue(0, 2));
-            this.offsets.set(4, new OffsetValue(-Math.sqrt(3), 1));
-            this.offsets.set(5, new OffsetValue(-Math.sqrt(3), -1));
+            this.offsets.set(4, new OffsetValue(-sqrtOfThree, 1));
+            this.offsets.set(5, new OffsetValue(-sqrtOfThree, -1));
         }
     }
 
@@ -420,4 +428,4 @@ class OffsetValue {
     constructor(public x: number, public y: number) { }
 }
 
-var layout = new Layout(20, 5, Orientation.pointy);
+var layout = new Layout(20, 5, Orientation.flat);
