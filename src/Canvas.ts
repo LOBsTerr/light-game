@@ -1,5 +1,8 @@
 import { Point } from "./Point";
 
+/**
+ * Canvas class handles operation with HTML canvas.
+ */
 export class Canvas {
 
     public canvas: HTMLCanvasElement;
@@ -15,12 +18,24 @@ export class Canvas {
 
         this.context = this.canvas.getContext("2d") as CanvasRenderingContext2D;
         const dpr = window.devicePixelRatio;
-        this.canvas.height = 500;
         this.canvas.width = 1000;
+        this.canvas.height = 700;
         this.context.scale(dpr, dpr);
     }
 
-    public drawCircle(point: Point, radius: number, fill: boolean = false, color: string = 'grey'): void {
+    /**
+     * Draw the circle in a specific point.
+     *
+     * @param point
+     *   Center of the circle.
+     * @param radius 
+     *   Radius of the circle.
+     * @param fill
+     *   Fill the circle with color.
+     * @param color 
+     *   Color.
+     */
+    public circle(point: Point, radius: number, fill: boolean = false, color: string = 'grey'): void {
         this.context.beginPath();
         this.context.fillStyle = color;
         this.context.arc(point.x, point.y, radius, 0, Math.PI * 2);
@@ -31,7 +46,17 @@ export class Canvas {
         this.context.stroke();
     }
 
-    public drawLine(start: Point, end: Point, color: string = 'black'): void {
+    /**
+     * Draw line from point to point.
+     *
+     * @param start
+     *   Starting point.
+     * @param end
+     *   Ending point.
+     * @param color 
+     *   Color.
+     */
+    public line(start: Point, end: Point, color: string = 'black'): void {
         this.context.beginPath();
         this.context.moveTo(start.x, start.y);
         this.context.lineTo(end.x, end.y);
@@ -45,6 +70,9 @@ export class Canvas {
         this.context.lineWidth = 1;
     }
 
+    /**
+     * Clean the canvas and redraw background.
+     */
     public clear(): void {
         let gradient = this.context.createLinearGradient(0, 0, this.canvas.width, 0);
         gradient.addColorStop(0, "#e8e6df");

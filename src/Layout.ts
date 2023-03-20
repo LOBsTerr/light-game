@@ -3,6 +3,9 @@ import { Canvas } from './Canvas';
 import { Item } from './Item';
 import { Orientation } from './Orientation';
 
+/**
+ * Class builds and handles game layout
+ */
 export class Layout {
     public static readonly left: string = 'left';
     public static readonly right: string = 'right';
@@ -30,6 +33,8 @@ export class Layout {
         orientation: string = Orientation.flat,
     ) {
         this.orientation = new Orientation(orientation);
+
+        // To make game possible we need at least 2 levels.
         if (this.levelCount < 1) {
             throw Error("Level count should be bigger than 0.");
         }
@@ -40,10 +45,13 @@ export class Layout {
         this.defineMouseListeners();
 
         this.buildLevels();
-        this.buildGraph();
-        this.draw();
+        this.buildTree();
+        this.render();
     }
 
+    /**
+     * Setup mouse click hanlders.
+     */
     protected defineMouseListeners() {
 
         let onLeftClick = (event: MouseEvent) => {
@@ -61,16 +69,28 @@ export class Layout {
         this.canvas.canvas.addEventListener('contextmenu', onRightClick, false);
     }
 
-    protected buildGraph(): void {
+    /**
+     * Build spanning tree randomly perform DFS.
+     */
+    protected buildTree(): void {
+        // Randomly set the starting point.
         let keys = Array.from(this.items.keys());
         this.startItem = this.items.get(keys[this.getRandomValue(keys.length)]) as Item;
         this.startItem.isMain = true;
+
+        // Recursive call to build tree for each neighbor.
         this.buildGraphItems(this.startItem);
 
+        // After the correct tree is build, we can randomly mixed items.
         this.randomlyTurnItems();
     }
 
+    /**
+     * Randomly turn the current item.
+     */
     protected randomlyTurnItems(): void {
+        // Shift randomly pattern, based on this pattern an item will be turn on the specific angle.
+        // One step shift give turn on 30%.
         for (let item of Array.from(this.items.values())) {
             item.randomPattern = [...item.pattern];
             let randomValue = this.getRandomValue(5);
@@ -78,27 +98,44 @@ export class Layout {
         }
     }
 
-    protected buildGraphItems(item: Item) {
+    /**
+     * We recursivly check every item's neighbor and randomly build the tree for them.
+     *
+     * @param item
+     *   Item to be processed.
+     */
+    protected buildGraphItems(item: Item): void {
+        // We visited the item, skip it.
         if (this.visited.has(item)) {
             return;
         }
 
         this.visited.add(item);
 
-        this.visited.add(item);
+        // We randoly shuffle neighbors.
         let neighborsKeys = this.shuffle(Array.from(item.neighbors.keys()));
 
         for (let key of neighborsKeys) {
             let neighbor: Item = item.neighbors.get(key) as Item;
             if (!this.visited.has(neighbor)) {
+                // Set the pattern for the item based, on the neighbors we visited.
                 item.pattern[key] = 1;
+                // Set back pattern to neighbor based on connection between item and neighbor.
                 neighbor.pattern[this.contreAngles[key]] = 1;
+
                 this.buildGraphItems(neighbor);
             }
         }
     }
 
-    protected getActivePath(item: Item): void {
+    /**
+     * Recursively build active path from starting item.
+     *
+     * @param item
+     *   Item to be processed.
+     */
+    protected buildActivePath(item: Item): void {
+        // We visited the item, skip it.
         if (this.visited.has(item)) {
             return;
         }
@@ -106,13 +143,28 @@ export class Layout {
         this.visited.add(item);
 
         for (let [key, neighbor] of item.neighbors.entries()) {
+            // Check the connection between the current item and neighbor based on patter.
             if (this.hasConnectedItem(item, neighbor, key)) {
-                this.drawItem(item, true);
-                this.getActivePath(neighbor);
+                // Highlight item if it part of the active path.
+                this.renderItem(item, true);
+                this.buildActivePath(neighbor);
             }
         }
     }
 
+    /**
+     * Check that item as connected based on their patterns.
+     *
+     * @param item
+     *   Current item.
+     * @param neighbor 
+     *   Neighbor.
+     * @param angle
+     *   Andgle where neighbor is located.
+     *
+     * @returns 
+     *   Are items connected.
+     */
     protected hasConnectedItem(item: Item, neighbor: Item, angle: number): boolean {
         if (
             item.randomPattern[angle] &&
@@ -126,36 +178,62 @@ export class Layout {
         return false;
     }
 
-    protected draw(): void {
-        
+    /**
+     * Render the current state of the game.
+     */
+    protected render(): void {
+        // Clear canvas before rerendering everything.
         this.canvas.clear();
 
+        // Render every state of the item.
         for (let item of this.items.values()) {
-            this.drawItem(item);
+            this.renderItem(item);
         }
 
+        // Rebuild active path.
         this.visited.clear();
-        this.getActivePath(this.startItem);
+        this.buildActivePath(this.startItem);
     }
 
-    protected drawItem(item: Item, highlightItem: boolean = false): void {
+    /**
+     * Render the given item.
+     *
+     * @param item
+     *   Item to be rendered.
+     * @param highlightItem
+     *   Is item highlighted.
+     */
+    protected renderItem(item: Item, highlightItem: boolean = false): void {
 
         for (let key in item.randomPattern) {
-            // this.canvas.drawCircle(item.center, this.size, false);
+            // this.canvas.circle(item.center, this.size, false);
             if (item.randomPattern[key] == 1) {
                 let offsetPoint = this.getPointWithOffset(item.center, Number(key), false);
                 let color = highlightItem || item.isMain ? 'red' : 'black';
-                this.canvas.drawLine(item.center, offsetPoint, color);
+                this.canvas.line(item.center, offsetPoint, color);
             }
         }
 
-        this.canvas.drawCircle(item.center, 3, true);
+        // Add small dot in the center of the item.
+        this.canvas.circle(item.center, 3, true);
     }
 
-    protected getRandomValue(length: number): number {
-        return Math.floor(Math.random() * length);
+    /**
+     * Get random value between 0 and max.
+     *
+     * @param max
+     *   Max value.
+     *
+     * @returns
+     *   Random value. 
+     */
+    protected getRandomValue(max: number): number {
+        return Math.floor(Math.random() * max);
     }
 
+    /**
+     * Build game leves.
+     */
     protected buildLevels(): void {
         let item: Item = new Item(this.center);
         this.items.set(item.center.json(), item);
@@ -164,6 +242,15 @@ export class Layout {
         this.addNeighbors();
     }
 
+    /**
+     * Get the item based on the coordinated on Canvas.
+     *
+     * @param point
+     *   Point on the canvase.
+     *
+     * @returns
+     *   Item or null.
+     */
     protected pointBelongCircle(point: Point): Item | null {
         for (let item of this.items.values()) {
             // (x – a)^2 + (y – b)^2 ≤ r^2, (a,b) center of circle, r - radius
@@ -175,6 +262,15 @@ export class Layout {
         return null;
     }
 
+    /**
+     * Add item for given point.
+     *
+     * @param point
+     *   The center of the item.
+     *
+     * @returns
+     *   Item.
+     */
     protected addItem(point: Point): Item {
         let item: Item;
         let json = point.json();
@@ -190,14 +286,34 @@ export class Layout {
         return item;
     }
 
+    /**
+     * Turn item on clockwise (right) and counterclockwise (left).
+     *
+     * @param item
+     *    Item to be turned.
+     * @param shift
+     *    Shift in the pattern, one shift give 30 degree turn.
+     * @param direction 
+     *    Direction it could be left or right.
+     */
     protected turnItem(item: Item, shift: number, direction: string): void {
         item.randomPattern = this.shift(item.randomPattern, shift, direction);
-        this.draw();
+        // After the turn we need rerender everything.
+        this.render();
     }
 
+    /**
+     * Build recurssively the connection between items based on the level numbers.
+     *
+     * @param currentItem
+     *   Item.
+     * @param currentLevel
+     *   Level.
+     */
     protected buildLevel(currentItem: Item, currentLevel: number): void {
         currentLevel++;
 
+        // We reached the given level, we can stop recurssion.
         if (currentLevel > this.levelCount) {
             return;
         }
@@ -210,6 +326,19 @@ export class Layout {
         }
     }
 
+    /**
+     * Shift pattern on the left or on the right.
+     *
+     * @param list
+     *   Array of items.
+     * @param shift
+     *   Shift which we want to apply.
+     * @param direction
+     *   We shift list on the left or on the right.
+     *
+     * @returns
+     *   New array with the shift.
+     */
     protected shift(list: number[], shift: number, direction: string): number[] {
         for (let i = 0; i < shift; i++) {
             if (direction == Layout.left) {
@@ -224,6 +353,19 @@ export class Layout {
         return list;
     }
 
+    /**
+     * Get offset for x and y coordinates from the given point based on Orientation.
+     *
+     * @param point
+     *   The given point.
+     * @param angle
+     *   Angle to which we want to get offset.
+     * @param isCenter
+     *   Is this the center of new item or the point on the circle.
+     *
+     * @returns 
+     *   Gets a point with offset.
+     */
     protected getPointWithOffset(point: Point, angle: number, isCenter: boolean = true): Point {
         // We keep only 2 decimal number precision.
         let devider = isCenter ? 1 : 2;
@@ -233,6 +375,9 @@ export class Layout {
         );
     }
 
+    /**
+     * We need to set all possible connection between items to build a tree later.
+     */
     protected addNeighbors(): void {
         for (let item of this.items.values()) {
             for (let x: number = 0; x < Layout.anglesCount; x++) {
@@ -246,6 +391,12 @@ export class Layout {
         }
     }
 
+    /**
+     * On left mouse button click handler.
+     *
+     * @param event
+     *  Event. 
+     */
     protected onLeftClick(event: MouseEvent): void {
         let item = this.pointBelongCircle(this.getCanvasClickedPoint(event));
         if (item) {
@@ -272,6 +423,12 @@ export class Layout {
         return new Point(x, y);
     }
 
+    /**
+     * On right mouse button click handler.
+     *
+     * @param event
+     *  Event. 
+     */
     protected onRightClick(event: MouseEvent): void {
         event.preventDefault();
 
@@ -283,6 +440,15 @@ export class Layout {
         }
     }
 
+    /**
+     * Shuffle array items.
+     *
+     * @param array
+     *   Given array.
+     *
+     * @returns
+     *   Shufftled array.
+     */
     protected shuffle(array: number[]): number[] {
         let copy = [];
         let n = array.length, i;
@@ -306,6 +472,9 @@ export class Layout {
 
 }
 
+/**
+ * Dictionary interface.
+ */
 interface Dictionary<Type> {
     [key: number]: Type;
 }
