@@ -4,8 +4,7 @@
   "description": "Light",
   "main": "index.js",
   "scripts": {
-    "start": "tsc --watch",
-    "build": "npx webpack build"
+    "build": "webpack --mode production"
   },
   "repository": {
     "type": "git",
