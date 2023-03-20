@@ -54,14 +54,14 @@ export class Layout {
      */
     protected defineMouseListeners() {
 
-        let onLeftClick = (event: MouseEvent) => {
+        const onLeftClick = (event: MouseEvent) => {
             this.onLeftClick(event)
         }
         onLeftClick.bind(this);
 
         this.canvas.canvas.addEventListener('click', onLeftClick, false);
 
-        let onRightClick = (event: MouseEvent) => {
+        const onRightClick = (event: MouseEvent) => {
             this.onRightClick(event);
         }
         onRightClick.bind(this);
@@ -74,7 +74,7 @@ export class Layout {
      */
     protected buildTree(): void {
         // Randomly set the starting point.
-        let keys = Array.from(this.items.keys());
+        const keys = Array.from(this.items.keys());
         this.startItem = this.items.get(keys[this.getRandomValue(keys.length)]) as Item;
         this.startItem.isMain = true;
 
@@ -91,9 +91,9 @@ export class Layout {
     protected randomlyTurnItems(): void {
         // Shift randomly pattern, based on this pattern an item will be turn on the specific angle.
         // One step shift give turn on 30%.
-        for (let item of Array.from(this.items.values())) {
+        for (const item of Array.from(this.items.values())) {
             item.randomPattern = [...item.pattern];
-            let randomValue = this.getRandomValue(5);
+            const randomValue = this.getRandomValue(5);
             this.turnItem(item, randomValue, Layout.left);
         }
     }
@@ -113,10 +113,10 @@ export class Layout {
         this.visited.add(item);
 
         // We randoly shuffle neighbors.
-        let neighborsKeys = this.shuffle(Array.from(item.neighbors.keys()));
+        const neighborsKeys = this.shuffle(Array.from(item.neighbors.keys()));
 
-        for (let key of neighborsKeys) {
-            let neighbor: Item = item.neighbors.get(key) as Item;
+        for (const key of neighborsKeys) {
+            const neighbor: Item = item.neighbors.get(key) as Item;
             if (!this.visited.has(neighbor)) {
                 // Set the pattern for the item based, on the neighbors we visited.
                 item.pattern[key] = 1;
@@ -142,7 +142,7 @@ export class Layout {
 
         this.visited.add(item);
 
-        for (let [key, neighbor] of item.neighbors.entries()) {
+        for (const [key, neighbor] of item.neighbors.entries()) {
             // Check the connection between the current item and neighbor based on patter.
             if (this.hasConnectedItem(item, neighbor, key)) {
                 // Highlight item if it part of the active path.
@@ -186,7 +186,7 @@ export class Layout {
         this.canvas.clear();
 
         // Render every state of the item.
-        for (let item of this.items.values()) {
+        for (const item of this.items.values()) {
             this.renderItem(item);
         }
 
@@ -205,11 +205,11 @@ export class Layout {
      */
     protected renderItem(item: Item, highlightItem: boolean = false): void {
 
-        for (let key in item.randomPattern) {
+        for (const key in item.randomPattern) {
             // this.canvas.circle(item.center, this.size, false);
             if (item.randomPattern[key] == 1) {
-                let offsetPoint = this.getPointWithOffset(item.center, Number(key), false);
-                let color = highlightItem || item.isMain ? 'red' : 'black';
+                const offsetPoint = this.getPointWithOffset(item.center, Number(key), false);
+                const color = highlightItem || item.isMain ? 'red' : 'black';
                 this.canvas.line(item.center, offsetPoint, color);
             }
         }
@@ -235,7 +235,7 @@ export class Layout {
      * Build game leves.
      */
     protected buildLevels(): void {
-        let item: Item = new Item(this.center);
+        const item: Item = new Item(this.center);
         this.items.set(item.center.json(), item);
 
         this.buildLevel(item, 1);
@@ -252,7 +252,7 @@ export class Layout {
      *   Item or null.
      */
     protected pointBelongCircle(point: Point): Item | null {
-        for (let item of this.items.values()) {
+        for (const item of this.items.values()) {
             // (x – a)^2 + (y – b)^2 ≤ r^2, (a,b) center of circle, r - radius
             if (Math.pow(point.x - item.center.x, 2) + Math.pow(point.y - item.center.y, 2) <= Math.pow(this.size, 2)) {
                 return item;
@@ -273,13 +273,12 @@ export class Layout {
      */
     protected addItem(point: Point): Item {
         let item: Item;
-        let json = point.json();
+        const json = point.json();
 
         if (!this.items.has(json)) {
             item = new Item(point);
             this.items.set(json, item);
-        }
-        else {
+        } else {
             item = this.items.get(json) as Item;
         }
 
@@ -320,8 +319,8 @@ export class Layout {
 
         // Run through all angles to build neighbors.
         for (let x: number = 0; x < Layout.anglesCount; x++) {
-            let center = this.getPointWithOffset(currentItem.center, x);
-            let neighbor: Item = this.addItem(center);
+            const center = this.getPointWithOffset(currentItem.center, x);
+            const neighbor: Item = this.addItem(center);
             this.buildLevel(neighbor, currentLevel);
         }
     }
@@ -342,11 +341,10 @@ export class Layout {
     protected shift(list: number[], shift: number, direction: string): number[] {
         for (let i = 0; i < shift; i++) {
             if (direction == Layout.left) {
-                let item = list.pop() as number;
+                const item = list.pop() as number;
                 list.unshift(item);
-            }
-            else {
-                let item = list.shift() as number;
+            } else {
+                const item = list.shift() as number;
                 list.push(item);
             }
         }
@@ -368,7 +366,7 @@ export class Layout {
      */
     protected getPointWithOffset(point: Point, angle: number, isCenter: boolean = true): Point {
         // We keep only 2 decimal number precision.
-        let devider = isCenter ? 1 : 2;
+        const devider = isCenter ? 1 : 2;
         return new Point(
             +((point.x + this.size * this.orientation.getOffsetX(angle) / devider).toFixed(2)),
             +((point.y + this.size * this.orientation.getOffsetY(angle) / devider).toFixed(2))
@@ -379,10 +377,10 @@ export class Layout {
      * We need to set all possible connection between items to build a tree later.
      */
     protected addNeighbors(): void {
-        for (let item of this.items.values()) {
+        for (const item of this.items.values()) {
             for (let x: number = 0; x < Layout.anglesCount; x++) {
 
-                let center = this.getPointWithOffset(item.center, x);
+                const center = this.getPointWithOffset(item.center, x);
 
                 if (this.items.has(center.json())) {
                     item.neighbors.set(x, this.items.get(center.json()) as Item);
@@ -398,7 +396,7 @@ export class Layout {
      *  Event. 
      */
     protected onLeftClick(event: MouseEvent): void {
-        let item = this.pointBelongCircle(this.getCanvasClickedPoint(event));
+        const item = this.pointBelongCircle(this.getCanvasClickedPoint(event));
         if (item) {
             if (event.button == 0) {
                 this.turnItem(item, 1, Layout.left);
@@ -432,7 +430,7 @@ export class Layout {
     protected onRightClick(event: MouseEvent): void {
         event.preventDefault();
 
-        let item = this.pointBelongCircle(this.getCanvasClickedPoint(event));
+        const item = this.pointBelongCircle(this.getCanvasClickedPoint(event));
         if (item) {
             if (event.button == 2) {
                 this.turnItem(item, 1, Layout.right);
@@ -450,7 +448,7 @@ export class Layout {
      *   Shufftled array.
      */
     protected shuffle(array: number[]): number[] {
-        let copy = [];
+        const copy = [];
         let n = array.length, i;
 
         // While there remain elements to shuffle.
